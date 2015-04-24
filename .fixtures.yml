@@ -4,7 +4,11 @@ fixtures:
     sudo:
         repo: 'git://github.com/bobtfish/puppet-sudo.git'
         ref: 530bb59a8d593bf664868dccd0ca2e84e8ae50f9
-    sensu: 'git://github.com/sensu/sensu-puppet.git'
-    apt: "git://github.com/bobtfish/puppetlabs-apt.git"
+    sensu:
+        repo: 'git://github.com/sensu/sensu-puppet.git'
+        ref: 1.8.0
+    apt:
+        repo: "git://github.com/puppetlabs/puppetlabs-apt.git"
+        ref: 1.8.0
   symlinks:
     monitoring_check: "#{source_dir}"
