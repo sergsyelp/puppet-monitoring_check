@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Returns 0 if sudo is NOT ready for a particular command.
+# Useful to detect if the sudo rules are not in place yet.
+#
+# This allows sensu to run a command and still return "OK"
+# because puppet may not have put in the sudo rules yet.
+# (Or when sensu removes sudo rules when removing a check)
+if sudo -n -l $1 >/dev/null 2>&1; then
+  exit 1
+else
+  echo "Sudo rules NOT are in place to run $1"
+  echo "This is OK if the check has been recent removed or added"
+  exit 0
+fi

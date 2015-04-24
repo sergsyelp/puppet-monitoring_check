@@ -174,7 +174,7 @@ describe 'monitoring_check' do
       let(:params) { {:command => '/bin/bar --foo --baz', :runbook => 'http://gronk', :needs_sudo => true, :sudo_user => 'fred'} }
       it do
         should contain_sensu__check('examplecheck') \
-          .with_command('sudo -H -u fred -- /bin/bar --foo --baz')
+          .with_command('sudo_isnt_ready || sudo -n -H -u fred -- /bin/bar --foo --baz')
         should contain_sudo__conf("sensu_examplecheck") \
           .with_content("sensu       ALL=(fred) NOPASSWD: /bin/bar\nDefaults!/bin/bar !requiretty")
       end

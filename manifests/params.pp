@@ -59,4 +59,12 @@ class monitoring_check::params (
     source => 'puppet:///modules/monitoring_check/send-test-sensu-alert',
   }
 
+  file { "${bin_path}/sudo_isnt_ready":
+    ensure => 'file',
+    mode   => '0555',
+    owner  => 'root',
+    group  => 'root',
+    source => 'puppet:///modules/monitoring_check/sudo_isnt_ready',
+  }
+
 }
