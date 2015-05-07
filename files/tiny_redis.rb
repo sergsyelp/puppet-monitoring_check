@@ -33,10 +33,13 @@ module TinyRedis
         begin
           expire interval
           yield
+          nil
         rescue => e
           expire
           raise e
         end
+      else
+        redis.pttl(key).to_f/1000
       end
     end
 

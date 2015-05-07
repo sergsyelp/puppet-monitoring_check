@@ -22,23 +22,20 @@ describe CheckCluster do
         :echo    => "hello",
         :setnx   => 1,
         :pexpire => 1,
+        :pttl    => 1,
         :get     => Time.now.to_i - 5)
     end
   end
 
   let(:logger) { StringIO.new("") }
 
-  # let(:api) do
-  #   double(:api).tap do |api|
-  #     api.stub(:request).
-  #       with("/aggregates/test_check", {:age=>30}).
-  #       and_return([1, 2, 3])
-
-  #     api.stub(:request).
-  #       with("/aggregates/test_check/3").
-  #       and_return('ok' => 1, 'total' => 1)
-  #   end
-  # end
+  let(:api) do
+    double(:api).tap do |api|
+      api.stub(:request).
+        with("/checks/test_check", {:age=>30}).
+        and_return([1, 2, 3])
+    end
+  end
 
   let(:aggregator) do
     double(:aggregator).tap do |agg|
@@ -77,21 +74,7 @@ describe CheckCluster do
 
       it "when check locked" do
         redis.stub(:setnx).and_return 0
-        expect_status :ok, /Lock expires in/
-        check.run
-      end
-
-      it "when lock problem" do
-        redis.stub(:setnx).and_return 0
-        redis.stub(:get).and_return nil
-        expect_status :ok, /problem/
-        check.run
-      end
-
-      it "when lock expired" do
-        redis.stub(:setnx).and_return 0
-        redis.stub(:get).and_return 0
-        expect_status :ok, /expired/
+        expect_status :ok, /locked for/
         check.run
       end
     end
@@ -105,12 +88,6 @@ describe CheckCluster do
     end
 
     context "should be UNKNOWN" do
-      it "when no status was reported" do
-        expect_status :unknown, "Check didn't report status"
-        check.stub(:locked_run).and_return nil
-        check.run
-      end
-
       it "when wrong version of sensu" do
         stub_const("Sensu::VERSION", "0.12")
         expect_status :unknown, "Sensu <0.13 is not supported"
