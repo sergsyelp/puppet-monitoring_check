@@ -1,0 +1,17 @@
+{
+  "name": "yelp/monitoring_check",
+  "version": "0.0.1",
+  "author": "Yelp",
+  "summary": "Wrapper for sensu::check with Yelpisms",
+  "license": "Apache 2.0",
+  "source": "https://github.com/Yelp/puppet-monitoring_check",
+  "project_page": "https://github.com/Yelp/puppet-monitoring_check",
+  "issues_url": "https://github.com/Yelp/puppet-monitoring_check/issues",
+  "dependencies": [
+    {
+      "name": "puppetlabs-stdlib",
+      "version_requirement": ">= 1.0.0"
+    }
+  ],
+  "operatingsystem_support": []
+}
