@@ -53,6 +53,19 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     :description => "Include silenced hosts in total",
     :default => false
 
+  option :depth,
+    :short => "-D 5",
+    :long => "--depth 5",
+    :description => "History depth to look at for volumetric mode",
+    :proc => proc {|a| a.to_i },
+    :default => 5
+
+  option :volumetric,
+    :short => "-V yes",
+    :long => "--volumetric yes",
+    :description => "Report on failures tracked in check history",
+    :default => false
+
   option :dryrun,
     :short => "-d",
     :long => "--dry-run",
@@ -64,7 +77,7 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     :long => "--verbose",
     :description => "Print debug information",
     :default => false
-  
+
   def run
     unless check_sensu_version
       unknown "Sensu <0.13 is not supported"
@@ -122,7 +135,13 @@ private
   end
 
   def aggregator
-    RedisCheckAggregate.new(redis, config[:check], logger, config[:cluster_name])
+    if config[:volumetric]
+      RedisVolumeAggregate.new(
+        redis, config[:check], logger, config[:cluster_name], config[:depth])
+    else
+      RedisCheckAggregate.new(
+        redis, config[:check], logger, config[:cluster_name])
+    end
   end
 
   def check_sensu_version
@@ -230,10 +249,7 @@ class RedisCheckAggregate
       :failing  => failing,
       :total    => all.size,
       :ok       => active.count{ |_,data| data[1].to_i == 0 },
-      :silenced => all.count do |server, time|
-        [server, @check, "#{server}/#@check"].map{|s| "stash:silence/#{s}"}.
-          any? {|key| @redis.get(key) }
-      end }
+      :silenced => silenced_servers(all) }
   end
 
   private
@@ -253,6 +269,44 @@ class RedisCheckAggregate
       keys = @redis.keys("result:*:#@check")
       raise "No servers found for #@check" if !keys || keys.empty?
       keys.map {|key| key.split(':')[1] }.reject {|s| s == @cluster_name }
+    end
+  end
+
+  def silenced_servers(servers)
+    servers.count do |server, time|
+      [server, @check, "#{server}/#@check"].map{|s| "stash:silence/#{s}"}.
+        any? {|key| @redis.get(key) }
+    end
+  end
+end
+
+class RedisVolumeAggregate < RedisCheckAggregate
+  def initialize(*args)
+    super(*args[0..-2])
+    @depth = args.last
+  end
+
+  def summary(interval)
+    # we only care about entries with executed timestamp
+    all     = last_execution(find_servers).select{|_,data| data[0]}
+    active  = all.select { |_, data| data[0].to_i >= Time.now.to_i - interval }
+
+    logger.debug "All #{all.length} hosts' latest result with timestamp for check #@check:\n#{all}\n\n"
+    logger.debug "All #{active.length} hosts with #@check that have responded in the last #{interval} seconds:\n#{active}\n\n"
+
+    status_volume = volume(active)
+
+    { :stale    => all.keys - active.keys,
+      :failing  => status_history.count { |status| status != 0 },
+      :total    => status_history.size,
+      :ok       => status_history.count { |status| status == 0 },
+      :silenced => silenced_servers }
+  end
+
+  def volume(servers)
+    servers.inject([]) do |list, server|
+      hash.push(*@redis.lrange("history:#{server}:#@check", -@depth-1, -1).
+                        map(&:to_i))
     end
   end
 end
