@@ -65,6 +65,12 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     :description => "Include silenced hosts in total",
     :default => false
 
+  option :ignore_nohosts,
+    :short => "-I yes",
+    :long => "--ignore-nohosts yes",
+    :description => "Don't fail if there are no hosts",
+    :default => false
+
   option :dryrun,
     :short => "-d",
     :long => "--dry-run",
@@ -121,7 +127,11 @@ class CheckCluster < Sensu::Plugin::Check::CLI
   rescue SocketError => e
     unknown "Can't connect to Redis at #{redis.host}:#{redis.port}: #{e.message}"
   rescue NoServersFound => e
-    unknown "#{e.message}"
+    if ignore_nohosts
+      ok "Cluster check did not find any hosts: #{e.message}"
+    else
+      unknown "#{e.message}"
+    end
   rescue RuntimeError => e
     critical "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
