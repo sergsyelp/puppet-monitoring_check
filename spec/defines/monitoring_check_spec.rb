@@ -38,6 +38,7 @@ describe 'monitoring_check' do
           .with_handlers('default') \
           .with_interval(default_interval) \
           .without_subdue \
+          .without_env_vars \
           .with_command('bar') \
           .with_custom({
             "alert_after"        => "0",
@@ -349,6 +350,16 @@ describe 'monitoring_check' do
       }}
       it {
         should contain_sensu__check('examplecheck').with_subdue('bar' => 'baz')
+      }
+    end
+
+    context 'with env_vars' do
+      let(:params) {{
+        :command => 'foo', :runbook => 'http://gronk',
+        :env_vars => { 'VAR1' => '1', 'VAR2' => 'too' }
+      }}
+      it {
+        should contain_sensu__check('examplecheck').with_command('VAR1=1 VAR2=too foo')
       }
     end
   end

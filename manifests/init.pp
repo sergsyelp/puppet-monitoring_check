@@ -138,6 +138,9 @@
 # A hash the determines if and when a check should be silenced for a peroid of time,
 # such as within working hours.
 #
+# [*env_vars*]
+# A hash that declares environment variables to be set when running the check command
+#
 # This, by default allows you to set the $::override_sensu_checks_to fact
 # in /etc/facter/facts.d to stop checks on a single machine from alerting via the
 # normal mechanism. Setting this to false will stop this mechanism from applying
@@ -176,6 +179,7 @@ define monitoring_check (
   $can_override          = true,
   $tags                  = [],
   $subdue                = undef,
+  $env_vars              = undef,
 ) {
 
   include monitoring_check::params
@@ -200,6 +204,9 @@ define monitoring_check (
   validate_hash($sensu_custom)
   if $subdue != undef {
     validate_hash($subdue)
+  }
+  if $env_vars!= undef {
+    validate_hash($env_vars)
   }
 
   $interval_s = human_time_to_seconds($check_every)
@@ -258,6 +265,14 @@ define monitoring_check (
     $real_command = $sudo_command
   }
 
+  if $env_vars != undef {
+    $env_vars_array = join_keys_to_values($env_vars, "=")
+    $env_vars_string = join($env_vars_array, " ")
+    $final_command = "${env_vars_string} ${real_command}"
+  } else {
+    $final_command = $real_command
+  }
+
   $base_dict = {
     alert_after        => $alert_after_s,
     realert_every      => $realert_every,
@@ -289,7 +304,7 @@ define monitoring_check (
     }
     $sensu_check_params = delete_undef_values({
       handlers            => $handlers,
-      command             => $real_command,
+      command             => $final_command,
       interval            => $interval_s,
       timeout             => $timeout_s,
       low_flap_threshold  => $low_flap_threshold,
