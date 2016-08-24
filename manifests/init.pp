@@ -285,7 +285,6 @@ define monitoring_check (
     tip                => $tip,
     habitat            => $::habitat,
     tags               => $tags,
-    where              => $where_location
   }
   if getvar('::override_sensu_checks_to') and $can_override {
     $with_override = merge($base_dict, {
@@ -312,6 +311,7 @@ define monitoring_check (
       custom              => $custom,
       source              => $source,
       subdue              => $subdue,
+      where              => $where_location,
     })
     # quotes around $name are needed to ensure its value comes from monitoring_check
     create_resources('sensu::check', { "${name}" => $sensu_check_params })
