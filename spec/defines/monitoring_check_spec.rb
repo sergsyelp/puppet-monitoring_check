@@ -19,6 +19,7 @@ describe 'monitoring_check' do
         }.to raise_error(Puppet::Error, /No sensu_handlers::teams/)
       end
   end
+
   context 'with teams data' do
     let(:pre_condition) { %q{
       include apt
@@ -133,6 +134,7 @@ describe 'monitoring_check' do
         expect { should contain_monitoring_check('examplecheck') }.to raise_error(Exception, /does not match/)
       end
     end
+
     context "with one dependency" do
       let(:params) { {:command => 'bar', :runbook => 'http://gronk', :dependencies => 'dep1'} }
       it { should contain_sensu__check('examplecheck').with_dependencies(['dep1']) }
@@ -180,7 +182,7 @@ describe 'monitoring_check' do
     end
 
     context "nowake, nopage" do
-      let(:params) { {:command => 'bar', :runbook => 'http://gronk', :page => 'false'} }
+      let(:params) { {:command => 'bar', :runbook => 'http://gronk', :page => false} }
       it { should contain_sensu__check('examplecheck').with_custom({
           "runbook"            => "http://gronk",
           "ticket"             => false,
@@ -200,7 +202,7 @@ describe 'monitoring_check' do
     end
 
     context "With a SLA defined" do
-      let(:params) { {:command => 'bar', :runbook => 'http://gronk', :page => 'false', :sla=>'custom SLA'} }
+      let(:params) { {:command => 'bar', :runbook => 'http://gronk', :page => false, :sla=>'custom SLA'} }
       it { should contain_sensu__check('examplecheck').with_custom({
           "runbook"            => "http://gronk",
           "ticket"             => false,
@@ -228,6 +230,7 @@ describe 'monitoring_check' do
           .with_content("sensu       ALL=(fred) NOPASSWD: /bin/bar\nDefaults!/bin/bar !requiretty")
       end
     end
+
     context "sudo with a non qualified command" do
       let(:params) { {:command => 'bar --foo --baz', :runbook => 'http://gronk', :needs_sudo => true, :sudo_user => 'fred'} }
       it { should_not compile }
@@ -268,6 +271,7 @@ describe 'monitoring_check' do
         }
       )}
     end
+
     context "with override_sensu_checks_to set and can_override false" do
       let(:facts) { { :habitat => "somehabitat", :override_sensu_checks_to => 'custom@override', :lsbdistid => 'Ubuntu', :osfamily => 'Debian', :lsbdistcodename => 'lucid', :operatingsystem => 'Ubuntu', :ipaddress => '127.0.0.1', :puppetversion => '3.6.2' } }
       let(:params) { {:command => 'bar', :runbook => 'http://gronk', :can_override => false } }
@@ -288,6 +292,7 @@ describe 'monitoring_check' do
         }
       )}
     end
+
     context "with a source" do
       let(:facts) { { :habitat => "somehabitat", :lsbdistid => 'Ubuntu', :osfamily => 'Debian', :lsbdistcodename => 'lucid', :operatingsystem => 'Ubuntu', :ipaddress => '127.0.0.1', :puppetversion => '3.6.2' } }
       let(:params) { {:command => 'bar', :runbook => 'http://gronk', :source => 'mysource' } }
@@ -308,11 +313,13 @@ describe 'monitoring_check' do
         }
       ).with_source('mysource') }
     end
+
     context "with a source which has a space" do
       let(:facts) { { :habitat => "somehabitat", :lsbdistid => 'Ubuntu', :osfamily => 'Debian', :lsbdistcodename => 'lucid', :operatingsystem => 'Ubuntu', :ipaddress => '127.0.0.1', :puppetversion => '3.6.2' } }
       let(:params) { {:command => 'bar', :runbook => 'http://gronk', :source => 'my source' } }
       it { should_not compile }
     end
+
     context "with tags" do
       let(:facts) { { :habitat => "somehabitat", :lsbdistid => 'Ubuntu', :osfamily => 'Debian', :lsbdistcodename => 'lucid', :operatingsystem => 'Ubuntu', :ipaddress => '127.0.0.1', :puppetversion => '3.6.2' } }
       let(:params) { {:command => 'bar', :runbook => 'http://gronk', :tags => ['first_tag', 'second_tag'] } }
@@ -333,6 +340,7 @@ describe 'monitoring_check' do
         }
       )}
     end
+
     context "with remediation" do
       let(:facts) { { :habitat => "somehabitat", :lsbdistid => 'Ubuntu', :osfamily => 'Debian', :lsbdistcodename => 'lucid', :operatingsystem => 'Ubuntu', :ipaddress => '127.0.0.1', :puppetversion => '3.6.2' } }
       let(:params) { {:command => '/bin/bar', :runbook => 'http://gronk', :remediation_action => '/bin/ls /', :remediation_retries => 2 } }
@@ -340,7 +348,6 @@ describe 'monitoring_check' do
         .with_command('/etc/sensu/plugins/remediation.sh -n "examplecheck" -c /bin/bar -a /bin/ls\ / -r 2') \
       }
     end
-
 
     context 'with subdue' do
       let(:params) {{
@@ -351,6 +358,7 @@ describe 'monitoring_check' do
         should contain_sensu__check('examplecheck').with_subdue('bar' => 'baz')
       }
     end
+
   end
 
 end

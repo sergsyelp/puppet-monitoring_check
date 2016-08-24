@@ -143,6 +143,9 @@
 # normal mechanism. Setting this to false will stop this mechanism from applying
 # to a check.
 #
+# [*where*]
+# A boolean which adds the path of where the check is configured within your Puppet manifest
+#
 define monitoring_check (
   $command,
   $runbook,
@@ -176,6 +179,7 @@ define monitoring_check (
   $can_override          = true,
   $tags                  = [],
   $subdue                = undef,
+  $where                 = false,
 ) {
 
   include monitoring_check::params
@@ -196,10 +200,19 @@ define monitoring_check (
   validate_re($team, "^(${team_names})$")
   validate_array($tags)
 
+  validate_bool($needs_sudo, $page, $ticket, $can_override, $where)
+
   validate_array($handlers)
   validate_hash($sensu_custom)
   if $subdue != undef {
     validate_hash($subdue)
+  }
+
+  if $where {
+    $where_location = where()
+    notice($where_location)
+   } else {
+    $where_location = undef
   }
 
   $interval_s = human_time_to_seconds($check_every)
@@ -272,6 +285,7 @@ define monitoring_check (
     tip                => $tip,
     habitat            => $::habitat,
     tags               => $tags,
+    where              => $where_location
   }
   if getvar('::override_sensu_checks_to') and $can_override {
     $with_override = merge($base_dict, {
