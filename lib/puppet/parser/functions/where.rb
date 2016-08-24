@@ -5,6 +5,6 @@ module Puppet::Parser::Functions
     :doc => <<-'ENDHEREDOC') do |args|
 Returns which file called this function so you can debug monitoring checks
 ENDHEREDOC
-    caller [0][/[^:]+/]
+    caller[0][/[^:]+/]
   end
 end
