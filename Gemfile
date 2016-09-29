@@ -5,6 +5,8 @@ group :development do
   gem "beaker-rspec", ">= 5.1.0"
   gem "beaker-puppet_install_helper"
   gem "pry"
+  gem "pry-byebug"
+  gem 'simplecov', :require => false, :group => :test
   gem "puppet-blacksmith"
   gem "serverspec"
   gem "vagrant-wrapper"

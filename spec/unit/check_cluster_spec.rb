@@ -1,5 +1,7 @@
 require "#{File.dirname(__FILE__)}/../unit_helper"
 require "#{File.dirname(__FILE__)}/../../files/check-cluster"
+require 'byebug'
+require 'pry-byebug'
 
 describe CheckCluster do
   let(:config) do
@@ -63,6 +65,7 @@ describe CheckCluster do
       it "when all is good" do
         expect_status :ok, /Cluster check successfully executed/
         expect_payload :ok, /0%/
+#        binding.pry
         check.run
       end
 
@@ -136,7 +139,8 @@ describe CheckCluster do
       it "when minimum nodes not met" do
         check.send(:check_aggregate, :ok => 5, :total => 5, :silenced => 0, :failing => [], :stale => []) do |status, message|
           expect(status).to be(2)
-          expect(message).to match(/minimum/)
+#          expect(message).to match(/minimum/)
+          expect(message).to match(/XYZ/)
         end
       end
     end

@@ -9,7 +9,10 @@ $: << File.dirname(__FILE__)
 require 'socket'
 require 'net/http'
 require 'logger'
+require 'time'
 require 'tiny_redis'
+require 'byebug'
+require 'pry-byebug'
 
 if !defined?(IN_RSPEC)
   require 'rubygems'
@@ -24,6 +27,12 @@ end
 class NoServersFound < RuntimeError
 end
 
+def plog(msg)
+    open('/tmp/x', 'a') do |f|
+      f.puts '*****' + Time.now.utc.iso8601 + msg
+    end
+end
+
 
 class CheckCluster < Sensu::Plugin::Check::CLI
   option :cluster_name,
@@ -31,6 +40,12 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     :long => "--cluster-name NAME",
     :description => "Name of the cluster to use in the source of the alerts",
     :required => true
+
+  option :multi_cluster,
+    :short => "-M yes",
+    :long => "--multi-cluster yes",
+    :description => "Group checks by cluster_name field in child nodes.",
+    :default => false
 
   option :min_nodes,
     :short => "-m MIN",
@@ -88,12 +103,24 @@ class CheckCluster < Sensu::Plugin::Check::CLI
       unknown "Sensu <0.13 is not supported"
       return
     end
-
     if !cluster_check[:interval]
       critical "Please configure interval"
       return
     end
+    if cluster_check[:multi_cluster]
+      run_multi
+    else
+      run_single
+    end
+  end
 
+private
+
+  def run_multi
+      plog('starting run_multi')
+  end
+
+  def run_single
     lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
     interval = cluster_check[:interval]
     staleness_interval = cluster_check[:staleness_interval] || cluster_check[:interval]
@@ -136,8 +163,6 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     critical "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
 
-private
-
   def logger
     @logger ||= Logger.new($stdout).tap do |logger|
       logger.formatter = proc {|_, _, _, msg| msg} if logger.respond_to? :formatter=
@@ -169,6 +194,7 @@ private
   #   silenced: number of *total* servers that are silenced or have
   #             target check silenced
   def check_aggregate(summary)
+#    binding.pry
     #puts "summary is #{summary}"
     total, ok, silenced, stale, failing = summary.values_at(:total, :ok, :silenced, :stale, :failing)
     return 'OK', 'No servers running the check' if total.zero?
@@ -238,9 +264,11 @@ class RedisCheckAggregate
     @redis  = redis
     @logger = logger
     @cluster_name = cluster_name
+    plog "redis query: #@check"
   end
 
   def summary(interval)
+#    binding.pry
     # we only care about entries with executed timestamp
     all     = last_execution(find_servers).select{|_,data| data[0]}
     active  = all.select { |_, data| data[0].to_i >= Time.now.to_i - interval }
@@ -259,6 +287,7 @@ class RedisCheckAggregate
       logger.info "The following #{failing.length} hosts are failing the check #{@check}:\n#{failing}\n\n"
     end
 
+    binding.pry
     { :stale    => stale,
       :failing  => failing,
       :total    => all.size,
