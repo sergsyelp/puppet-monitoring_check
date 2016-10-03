@@ -1,3 +1,4 @@
+
 require "#{File.dirname(__FILE__)}/../unit_helper"
 require "#{File.dirname(__FILE__)}/../../files/check-cluster"
 require 'byebug'
@@ -7,6 +8,7 @@ describe CheckCluster do
   let(:config) do
     { :check        => :test_check,
       :cluster_name => :test_cluster,
+      :multi_cluster => true,
       :pct_critical => 50,
       :min_nodes    => 0 }
   end
@@ -118,6 +120,7 @@ describe CheckCluster do
     context "should be CRITICAL" do
       it "when reached critical threshold" do
         check.send(:check_aggregate, :ok => 40, :total => 100, :silenced => 0, :failing => ["somehost.hostname.com", "anotherhost.example.com"], :stale => []) do |status, message|
+          binding.pry
           expect(status).to be(2)
           expect(message).to match(/60%/)
         end
