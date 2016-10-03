@@ -117,30 +117,32 @@ describe CheckCluster do
   context "payload" do
     context "should be CRITICAL" do
       it "when reached critical threshold" do
-        check.send(:check_aggregate, :ok => 40, :total => 100, :silenced => 0, :failing => ["somehost.hostname.com", "anotherhost.example.com"], :stale => []) do |status, message|
-          expect(status).to be(2)
-          expect(message).to match(/60%/)
-        end
+        status, message = check.send(
+            :check_aggregate, :ok => 40, :total => 100, :silenced => 0,
+            :failing => ["somehost.hostname.com", "anotherhost.example.com"],
+            :stale => [])
+        expect(status).to eq("CRITICAL")
+        expect(message).to match(/40%/)
       end
     end
 
     context "should include number of stale hosts in output" do
       it "when stale hosts are found" do
-        check.send(:check_aggregate, :ok => 90, :total => 100, :silenced => 0,
-                   :failing => [], :stale => [ 'host1', 'host2' ]) do |_, message|
-          expect(message).to match(/ 2 stale\./)
-        end
+        _, message = check.send(
+            :check_aggregate, :ok => 90, :total => 100, :silenced => 0,
+            :failing => [], :stale => [ 'host1', 'host2' ])
+        expect(message).to match(/ 2 stale\./)
       end
     end
 
     context "should be CRITICAL" do
       let(:config) { super().merge(:min_nodes => 10) }
       it "when minimum nodes not met" do
-        check.send(:check_aggregate, :ok => 5, :total => 5, :silenced => 0, :failing => [], :stale => []) do |status, message|
-          expect(status).to be(2)
-#          expect(message).to match(/minimum/)
-          expect(message).to match(/XYZ/)
-        end
+        status, message = check.send(
+            :check_aggregate, :ok => 5, :total => 5, :silenced => 0,
+            :failing => [], :stale => [])
+        expect(status).to eq("CRITICAL")
+        expect(message).to match(/Minimum/)
       end
     end
   end

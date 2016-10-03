@@ -27,10 +27,11 @@ end
 class NoServersFound < RuntimeError
 end
 
+
 def plog(msg)
-    open('/tmp/x', 'a') do |f|
-      f.puts '*****' + Time.now.utc.iso8601 + msg
-    end
+  open('/tmp/x', 'a') do |f|
+    f.puts '*****' + Time.now.utc.iso8601 + msg
+  end
 end
 
 
@@ -43,8 +44,8 @@ class CheckCluster < Sensu::Plugin::Check::CLI
 
   option :multi_cluster,
     :short => "-M yes",
-    :long => "--multi-cluster yes",
-    :description => "Group checks by cluster_name field in child nodes.",
+    :long => "--multi_cluster yes",
+    :description => "Group by cluster_name of client/child nodes.",
     :default => false
 
   option :min_nodes,
@@ -103,6 +104,7 @@ class CheckCluster < Sensu::Plugin::Check::CLI
       unknown "Sensu <0.13 is not supported"
       return
     end
+
     if !cluster_check[:interval]
       critical "Please configure interval"
       return
@@ -113,13 +115,13 @@ class CheckCluster < Sensu::Plugin::Check::CLI
       run_single
     end
   end
-
+   
 private
-
+  
   def run_multi
-      plog('starting run_multi')
+    plog('starting run_multi')
   end
-
+  
   def run_single
     lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
     interval = cluster_check[:interval]
@@ -163,6 +165,8 @@ private
     critical "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
 
+private
+
   def logger
     @logger ||= Logger.new($stdout).tap do |logger|
       logger.formatter = proc {|_, _, _, msg| msg} if logger.respond_to? :formatter=
@@ -194,7 +198,6 @@ private
   #   silenced: number of *total* servers that are silenced or have
   #             target check silenced
   def check_aggregate(summary)
-#    binding.pry
     #puts "summary is #{summary}"
     total, ok, silenced, stale, failing = summary.values_at(:total, :ok, :silenced, :stale, :failing)
     return 'OK', 'No servers running the check' if total.zero?
@@ -268,7 +271,6 @@ class RedisCheckAggregate
   end
 
   def summary(interval)
-#    binding.pry
     # we only care about entries with executed timestamp
     all     = last_execution(find_servers).select{|_,data| data[0]}
     active  = all.select { |_, data| data[0].to_i >= Time.now.to_i - interval }
@@ -287,7 +289,6 @@ class RedisCheckAggregate
       logger.info "The following #{failing.length} hosts are failing the check #{@check}:\n#{failing}\n\n"
     end
 
-    binding.pry
     { :stale    => stale,
       :failing  => failing,
       :total    => all.size,
