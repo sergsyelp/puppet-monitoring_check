@@ -1,10 +1,5 @@
 #!/opt/sensu/embedded/bin/ruby
-
 $: << File.dirname(__FILE__)
-
-#
-# Check Cluster
-#
 
 require 'socket'
 require 'net/http'
@@ -168,26 +163,27 @@ private
   #   ok:       number of *active* servers with check status OK
   #   silenced: number of *total* servers that are silenced or have
   #             target check silenced
+  #   stale:    servers that have not checks in but have old results
+  #   failing:  servers that have a recent check result of 2 (fail)
   def check_aggregate(summary)
-    #puts "summary is #{summary}"
+    logger.debug "summary is #{summary}"
     total, ok, silenced, stale, failing = summary.values_at(:total, :ok, :silenced, :stale, :failing)
     return 'OK', 'No servers running the check' if total.zero?
 
-    eff_total = total - silenced * (config[:silenced] ? 1 : 0)
-    return 'OK', 'All hosts silenced' if eff_total.zero?
+    eff_total = total - stale.size - silenced * (config[:silenced] ? 1 : 0)
+    return 'OK', 'All hosts either silenced or stale.' if eff_total <= 0
 
     ok_pct  = (100 * ok / eff_total.to_f).to_i
 
-    # Loop through the arrays and split the hostname so we get a short hostname
-    message = "#{ok} OK out of #{eff_total} total."
-    message << " #{silenced} silenced." if config[:silenced] && silenced > 0
-    message << " #{stale.size} stale." unless stale.empty?
+    message = "#{ok} OK out of #{eff_total} non-ignored total."
+    message << " #{silenced} silenced (ignored)" if config[:silenced] && silenced > 0
+    message << " #{stale.size} stale (ignored)." unless stale.empty?
     if config[:num_critical]
       message << " #{eff_total} OK #{failing.size} FAIL #{silenced} SILENT #{stale.size} STALE, #{config[:num_critical]} FAIL threshold: #{config[:num_critical]}"
     else
       message << " #{ok_pct}% OK, #{config[:pct_critical]}% threshold"
     end
-    message << "\nStale hosts: #{stale.map{|host| host.split('.').first}.sort[0..10].join ','}" unless stale.empty?
+    message << "\nStale hosts (ignored): #{stale.map{|host| host.split('.').first}.sort[0..10].join ','}" unless stale.empty?
     message << "\nFailing hosts: #{failing.map{|host| host.split('.').first}.sort[0..10].join ','}" unless failing.empty?
     message << "\nMinimum number of hosts required is #{config[:min_nodes]} and only #{ok} found" if ok < config[:min_nodes]
 

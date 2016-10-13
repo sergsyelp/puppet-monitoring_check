@@ -123,12 +123,13 @@ describe CheckCluster do
       end
     end
 
-    context "should include number of stale hosts in output" do
+    context "should include number of stale hosts in output, but ignore them" do
       it "when stale hosts are found" do
         _, message = check.send(
-            :check_aggregate, :ok => 90, :total => 100, :silenced => 0,
+            :check_aggregate, :ok => 90, :total => 102, :silenced => 0,
             :failing => [], :stale => [ 'host1', 'host2' ])
-        expect(message).to match(/ 2 stale\./)
+        expect(message).to match(/ 2 stale/)
+        expect(message).to match(/ 90% OK/)
       end
     end
 
