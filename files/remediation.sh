@@ -2,9 +2,7 @@
 
 # Takes a check command, and an action command
 # If the action doesn't return a 0, the action is run and the output is returned
-
 RETRIES=1
-echo $1
 while getopts "n:c:a:r:" arg; do
   case $arg in
   n)
@@ -28,38 +26,35 @@ done
 
 CHECK_OUTPUT=$($CHECK)
 CHECK_EXITCODE=$?
+echo -e "$CHECK_OUTPUT"
+
+# For logic, it is easier to compare attempts to max_attempts.
+# When a users says "0" retries, they really mean max_attempts=1
+let MAX_ATTEMPTS=$RETRIES+1
+
 if [ $CHECK_EXITCODE -eq 2 ]; then
-# The check failed. Lets try remediation
-  if [ -f "/tmp/$NAME" ]; then
-    # We've tried this before. Let's see if we have retries left
-    ATTEMPTS=`cat /tmp/$NAME`
-    if [ $ATTEMPTS -ge $RETRIES ]; then
-      CHECK_EXITCODE=2
-    fi
-    ATTEMPTS=$((ATTEMPTS + 1))
-    `echo $ATTEMPTS > /tmp/$NAME`
+
+  # The check failed. Lets try remediation
+  if [[ -f "/tmp/$NAME" ]]; then
+    ATTEMPTS=$(cat "/tmp/$NAME")
   else
-    ACTION_OUTPUT=$($ACTION)
-    ACTION_EXITCODE=$?
     ATTEMPTS=0
-    if [ $RETRIES -eq 0 ]; then
-      # We should alert if we don't want to retry
-      # This case is when we want the remediation action output after 1 failed
-      CHECK_EXITCODE=2
-    else
-      CHECK_EXITCODE=0
-    fi
+    echo $ATTEMPTS > "/tmp/$NAME"
+  fi
 
-    `echo 1 > /tmp/$NAME`
+  echo ""
+  if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+    echo "Not doing remediation. Already did $ATTEMPTS out of $MAX_ATTEMPTS attempts" >&2
+  else
+    ATTEMPTS=$((ATTEMPTS + 1))
+    echo "Trying remediation attempt $ATTEMPTS out of $MAX_ATTEMPTS..." >&2
+    $ACTION
+    echo $ATTEMPTS >"/tmp/$NAME"
+  fi
 
-   fi
-  CHECK_OUTPUT="$CHECK \n \n$CHECK_OUTPUT \n \nAction Command: $ACTION \n \nRetry Attempt: $ATTEMPTS\n \n \n$ACTION_OUTPUT"
 else
   # The check has succeeded. Let's clean up
-  if [ -f /tmp/$NAME ]; then
-    `rm /tmp/$NAME`
-  fi
+  rm -f "/tmp/$NAME"
 fi
 
-echo -e "$CHECK_OUTPUT"
 exit $CHECK_EXITCODE
