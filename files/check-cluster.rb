@@ -306,6 +306,7 @@ class RedisCheckAggregate
     servers.inject({}) do |hash, server|
       values = JSON.parse(@redis.get("result:#{server}:#@check")).
                  values_at("executed", "status") rescue []
+#                 values_at("executed", "status", "cluster_name") rescue []
       hash.merge!(server => values)
     end
   end

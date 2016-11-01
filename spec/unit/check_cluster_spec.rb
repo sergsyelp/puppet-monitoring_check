@@ -22,8 +22,8 @@ describe CheckCluster do
     double(:redis).tap do |redis|
       redis.stub(
         :echo    => "hello",
-        :setnx   => 1,
-        :pexpire => 1,
+        :setnx   => 1,  # key found
+        :pexpire => 1,  # timeout was set
         :get     => Time.now.to_i - 5,
         :host    => '127.0.0.1',
         :port    => 7777, )
@@ -34,7 +34,13 @@ describe CheckCluster do
 
   let(:aggregator) do
     double(:aggregator).tap do |agg|
-      agg.stub(:summary).and_return({:total => 1, :ok => 1, :silenced => 0, :failing => [], :stale => []})
+      agg.stub(:summary).and_return({
+          :total => 1,
+          :ok => 1,
+          :silenced => 0,
+          :failing => [],
+          :stale => []
+      })
     end
   end
 

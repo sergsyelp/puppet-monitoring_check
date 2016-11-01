@@ -5,3 +5,5 @@ require 'rspec-puppet-utils'
 require 'simplecov'
 
 SimpleCov.start
+
+#enable ':should'
