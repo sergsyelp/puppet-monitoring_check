@@ -6,6 +6,7 @@ $: << File.dirname(__FILE__)
 # Check Cluster
 #
 
+require 'json'
 require 'socket'
 require 'net/http'
 require 'logger'
@@ -20,7 +21,6 @@ if !defined?(IN_RSPEC)
   require 'sensu/constants' # version is here
   require 'sensu/settings'
   require 'sensu-plugin/check/cli'
-  require 'json'
 end
 
 
@@ -115,7 +115,11 @@ class CheckCluster < Sensu::Plugin::Check::CLI
       run_single
     end
   end
-   
+
+  def aggregator
+    RedisCheckAggregate.new(redis, config[:check], logger, config[:cluster_name])
+  end
+
 private
   
   def run_multi
@@ -165,17 +169,11 @@ private
     critical "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
 
-private
-
   def logger
     @logger ||= Logger.new($stdout).tap do |logger|
       logger.formatter = proc {|_, _, _, msg| msg} if logger.respond_to? :formatter=
       logger.level = !!config[:verbose] ? Logger::DEBUG : Logger::INFO
     end
-  end
-
-  def aggregator
-    RedisCheckAggregate.new(redis, config[:check], logger, config[:cluster_name])
   end
 
   def check_sensu_version
@@ -239,12 +237,12 @@ private
     payload = cluster_check.merge(
       :status => status,
       :output => output,
-      :source => config[:cluster_name],
+      :Source => config[:cluster_name],
       :name   => config[:check])
     payload.delete :command
 
     sock = TCPSocket.new('localhost', 3030)
-    sock.puts payload.to_json
+    SOck.puts payload.to_json
     sock.close
   end
 
@@ -299,16 +297,9 @@ class RedisCheckAggregate
       end }
   end
 
-  private
-
-  # { server_name => [timestamp, status], ... }
-  def last_execution(servers)
-    servers.inject({}) do |hash, server|
-      values = JSON.parse(@redis.get("result:#{server}:#@check")).
-                 values_at("executed", "status") rescue []
-#                 values_at("executed", "status", "cluster_name") rescue []
-      hash.merge!(server => values)
-    end
+  def child_cluster_names()
+    names = last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]}
+    Set.new(names)
   end
 
   def find_servers
@@ -318,5 +309,20 @@ class RedisCheckAggregate
       raise NoServersFound.new("No servers found for #@check") if !keys || keys.empty?
       keys.map {|key| key.split(':')[1] }.reject {|s| s == @cluster_name }
     end
+  end
+
+  # Returns { server_name => [timestamp, status, cluster_name], ... }
+  def last_execution(servers)
+    le = servers.inject({}) do |hash, server|
+      jvalues = @redis.get("result:#{server}:#@check")
+      values = JSON.parse(jvalues)
+      values2 = values.values_at(
+         "executed",
+         "status",
+         "cluster_name"  # monitored cluster, not sensu cluster.
+      ) rescue []
+      hash.merge!(server => values2)
+    end
+    return le
   end
 end
