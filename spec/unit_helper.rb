@@ -1,3 +1,6 @@
+require 'simplecov'
+SimpleCov.start
+
 # this is hacky but we really don't want to depend on sensu just for spec
 IN_RSPEC = true
 

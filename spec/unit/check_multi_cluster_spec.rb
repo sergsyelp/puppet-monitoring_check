@@ -7,6 +7,74 @@ def child_check_name
     "test_child_check"
 end
 
+def redis_keys(query)
+  if query == "result:*:#{child_check_name}" then
+    [
+      "result:10-10-10-101-dcname.dev.yelpcorp.com:#{child_check_name}",
+      "result:10-10-10-111-dcname.dev.yelpcorp.com:#{child_check_name}",
+      "result:10-10-10-121-dcname.dev.yelpcorp.com:#{child_check_name}",
+      "result:10-10-10-102-dcname.dev.yelpcorp.com:#{child_check_name}",
+      "result:10-10-10-112-dcname.dev.yelpcorp.com:#{child_check_name}",
+      "result:10-10-10-122-dcname.dev.yelpcorp.com:#{child_check_name}"
+    ]
+  else
+      raise "unexpected query: #{query}"
+  end
+end
+
+def cluster_name_from_host(host)
+  # fabricate cluster_name using last char/digit of host IP
+  "cluster_" + host.sub(/.*[-0-9]+(\d)-.*/, '\1')
+end
+
+def redis_get(query)
+  match = /result:([^:]+):#{child_check_name}/.match(query)
+  if match then
+    host = match[1]
+    # fabricate cluster_name using last char/digit of host IP
+    cluster_name = cluster_name_from_host(host)
+    {
+      "interval" => 300,
+      "standalone" => true,
+      "timeout" => 300,
+      "alert_after" => 300,
+      "ticket" => false,
+      "page" => true,
+      "cluster_name" => cluster_name,
+      "name" => child_check_name,
+      "issued" => Time.now.to_i - 5,
+      "executed" => Time.now.to_i - 5,
+      "duration" => 0.002,
+      "status" => 0,
+      "type" => "standard",
+    }.to_json
+  end
+end
+
+def redis_get_half_bad(query)
+  intermediate = redis_get(query)
+  if !intermediate then
+    return intermediate
+  end
+  result = JSON.parse(intermediate)
+  if result["cluster_name"] == "cluster_1" then
+    result["status"] = 2
+  end
+  result.to_json
+end
+
+def redis_get_all_bad(query)
+  intermediate = redis_get(query)
+  if !intermediate then
+    return intermediate
+  end
+  result = JSON.parse(intermediate)
+  if ["cluster_1", "cluster_2"].include?(result["cluster_name"]) then
+    result["status"] = 2
+  end
+  result.to_json
+end
+
 describe CheckCluster do
   let(:config) do
     { :check        => child_check_name, # name of child check to be aggregated
@@ -21,7 +89,8 @@ describe CheckCluster do
     { :checks => {
         :test_cluster_test_child_check => {
           :interval => 300,
-          :staleness_interval => '12h' } } }
+          :staleness_interval => 12*60*60  # '12h'
+        } } }
   end
 
   let(:redis) do
@@ -32,47 +101,8 @@ describe CheckCluster do
         :pexpire => 1,
         :host    => '127.0.0.1',
         :port    => 7777, )
-      redis.stub(:keys) do |query|
-        if query == "result:*:#{child_check_name}" then
-          [
-            "result:10-10-10-101-uswest1bdevprod.dev.yelpcorp.com:#{child_check_name}",
-            "result:10-10-10-111-uswest1bdevprod.dev.yelpcorp.com:#{child_check_name}",
-            "result:10-10-10-121-uswest1bdevprod.dev.yelpcorp.com:#{child_check_name}",
-            "result:10-10-10-102-uswest1bdevprod.dev.yelpcorp.com:#{child_check_name}",
-            "result:10-10-10-112-uswest1bdevprod.dev.yelpcorp.com:#{child_check_name}",
-            "result:10-10-10-122-uswest1bdevprod.dev.yelpcorp.com:#{child_check_name}"
-          ]
-        else
-            raise "unexpected query: #{query}"
-        end
-      end
-      redis.stub(:get) do |query|
-        match = /result:([^:]+):#{child_check_name}/.match(query)
-        if match then
-          host = match[1]
-          # fabricate cluster_name using last char/digit of host IP
-          cluster_name = "cluster_" + host.sub(/.*[-0-9]+(\d)-.*/, '\1')
-#          binding.pry
-          "{
-            \"interval\": 300,
-            \"standalone\": true,
-            \"timeout\": 300,
-            \"alert_after\": 300,
-            \"ticket\": false,
-            \"page\": true,
-            \"cluster_name\": \"#{cluster_name}\",
-            \"name\": \"#{child_check_name}\",
-            \"issued\": #{Time.now.to_i - 5},
-            \"executed\": #{Time.now.to_i - 5},
-            \"duration\": 0.002,
-            \"status\": 0,
-            \"type\": \"standard\"
-          }"
-        else
-          # copied from check_cluster_spec.rb - not sure what it's for yet
-          Time.now.to_i - 5
-        end
-      end
+      redis.stub(:keys) do |query| redis_keys(query) end
+      redis.stub(:get) do |query| redis_get(query) end
     end
   end
 
@@ -85,6 +115,7 @@ describe CheckCluster do
         :sensu_settings => sensu_settings,
         :redis          => redis,
         :logger         => logger,
+#        :send_payload   => nil,
 #        :aggregator     => aggregator,
         :unknown        => nil)
     end
@@ -114,19 +145,60 @@ describe CheckCluster do
 
     it "gets last execution details right" do
         agg = check.aggregator
-        servers = ["result:10-10-10-101-uswest1bdevprod.dev.yelpcorp.com"]
+        servers = ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
         le = agg.last_execution(servers)
         expect(le.keys).to eq(
-            ["result:10-10-10-101-uswest1bdevprod.dev.yelpcorp.com"]
+            ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
         )
-#            {"result:10-10-10-101-uswest1bdevprod.dev.yelpcorp.com"=>[1480591226, 0, "cluster_1"]}
     end
   end
 
-  context "'end-to-end'" do
-    it "is written that" do
-        pending("figuring out what we need to write here")
-        fail
+  context "end-to-end" do
+    it "no clusters failing" do
+        expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
+        expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
+        expect_status :ok, /Cluster check successfully executed/
+        check.run
+    end
+    context "single cluster failing" do
+      let(:redis) do  # TODO(pmu) want to figure out DRY - perhaps overriding 'let' per https://github.com/rspec/rspec-core/issues/294
+        double(:redis).tap do |redis|
+          redis.stub(
+            :echo    => "hello",
+            :setnx   => 1,
+            :pexpire => 1,
+            :host    => '127.0.0.1',
+            :port    => 7777, )
+          redis.stub(:keys) do |query| redis_keys(query) end
+          redis.stub(:get) do |query| redis_get_half_bad(query) end
+        end
+      end
+      it "single cluster failing" do
+        expect_payload :critical, /0 OK out of 3 total. 0% OK, 50% threshold/
+        expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
+        expect_status :ok, /Cluster check successfully executed/
+        check.run
+      end
+    end
+    context "both clusters failing" do
+      let(:redis) do  # TODO(pmu) want to figure out DRY - perhaps overriding 'let' per https://github.com/rspec/rspec-core/issues/294
+        double(:redis).tap do |redis|
+          redis.stub(
+            :echo    => "hello",
+            :setnx   => 1,
+            :pexpire => 1,
+            :host    => '127.0.0.1',
+            :port    => 7777, )
+          redis.stub(:keys) do |query| redis_keys(query) end
+          redis.stub(:get) do |query| redis_get_all_bad(query) end
+        end
+      end
+      it "both clusters failing" do
+        expect_payload :critical, /0 OK out of 3 total. 0% OK, 50% threshold/
+        expect_payload :critical, /0 OK out of 3 total. 0% OK, 50% threshold/
+        expect_status :ok, /Cluster check successfully executed/
+        check.run
+      end
     end
   end
 end

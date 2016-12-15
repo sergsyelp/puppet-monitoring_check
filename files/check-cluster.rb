@@ -12,8 +12,6 @@ require 'net/http'
 require 'logger'
 require 'time'
 require 'tiny_redis'
-require 'byebug'
-require 'pry-byebug'
 
 if !defined?(IN_RSPEC)
   require 'rubygems'
@@ -21,6 +19,8 @@ if !defined?(IN_RSPEC)
   require 'sensu/constants' # version is here
   require 'sensu/settings'
   require 'sensu-plugin/check/cli'
+  require 'byebug'
+  require 'pry-byebug'
 end
 
 
@@ -109,7 +109,7 @@ class CheckCluster < Sensu::Plugin::Check::CLI
       critical "Please configure interval"
       return
     end
-    if cluster_check[:multi_cluster]
+    if config[:multi_cluster]
       run_multi
     else
       run_single
@@ -121,9 +121,72 @@ class CheckCluster < Sensu::Plugin::Check::CLI
   end
 
 private
-  
+
   def run_multi
     plog('starting run_multi')
+    results = aggregator.child_cluster_names.map {|name| run_single_child(name)}
+    results_with_code = results.map{
+        |result| [EXIT_CODES[result[0].to_s.upcase], result[1]]
+    }
+    worst_code = results_with_code.map {|result| result[0]}.max
+    message = results_with_code
+        .select{|result| result[0]==worst_code}
+        .map{|result| result[1]}
+        .to_set
+        .to_a
+        .join(';')
+    worst_method_name = EXIT_CODES.key(worst_code).downcase
+    worst_method = self.method(worst_method_name)
+    worst_method.call(message)
+  end
+
+  # Returns status, message
+  def run_single_child(child_cluster_name)
+    plog('starting run_single_child: ' + child_cluster_name)
+    lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
+    interval = cluster_check[:interval]
+    staleness_interval = cluster_check[:staleness_interval] || cluster_check[:interval]
+
+    transaction_body = lambda { |is_dry_run, cluster_name|
+      status, output = check_aggregate(aggregator.summary(staleness_interval, cluster_name))
+      msg = "Cluster check successfully executed, with output: #{status}: #{output}"
+      if is_dry_run then
+        msg = "Dry run " + msg
+      else
+        logger.info output
+        send_payload EXIT_CODES[status], output
+      end
+      return :ok, msg
+    }
+
+    if config[:dryrun] then
+      return transaction_body.call(is_dry_run=true, child_cluster_name=child_cluster_name)
+    end
+    
+    mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
+    mutex.run_with_lock_or_skip do
+      return transaction_body.call(is_dry_run=false, child_cluster_name=child_cluster_name)
+    end
+
+    if (ttl = mutex.ttl) && ttl >= 0
+      return :ok, "Cluster check did not execute, lock expires in #{ttl}"
+    end
+
+    if ttl.nil?
+      return :ok, "Cluster check did not execute, lock expired sooner than round-trip time to redis server"
+    end
+
+    return :critical, "Cluster check did not execute, ttl: #{ttl.inspect}"
+  rescue SocketError => e
+    unknown "Can't connect to Redis at #{redis.host}:#{redis.port}: #{e.message}"
+  rescue NoServersFound => e
+    if config[:ignore_nohosts]
+      return :ok, "Cluster check did not find any hosts: #{e.message}"
+    else
+     return :unknown, "#{e.message}"
+    end
+  rescue RuntimeError => e
+    return :critical, "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
   
   def run_single
@@ -196,7 +259,6 @@ private
   #   silenced: number of *total* servers that are silenced or have
   #             target check silenced
   def check_aggregate(summary)
-    #puts "summary is #{summary}"
     total, ok, silenced, stale, failing = summary.values_at(:total, :ok, :silenced, :stale, :failing)
     return 'OK', 'No servers running the check' if total.zero?
 
@@ -242,7 +304,7 @@ private
     payload.delete :command
 
     sock = TCPSocket.new('localhost', 3030)
-    SOck.puts payload.to_json
+    sock.puts payload.to_json
     sock.close
   end
 
@@ -268,9 +330,12 @@ class RedisCheckAggregate
     plog "redis query: #@check"
   end
 
-  def summary(interval)
+  def summary(interval, child_cluster_name=nil)
     # we only care about entries with executed timestamp
     all     = last_execution(find_servers).select{|_,data| data[0]}
+    if !child_cluster_name.nil? then
+      all = all.select {|_, data| data[2]==child_cluster_name}
+    end
     active  = all.select { |_, data| data[0].to_i >= Time.now.to_i - interval }
 
     logger.debug "All #{all.length} hosts' latest result with timestamp for check #@check:\n#{all}\n\n"
