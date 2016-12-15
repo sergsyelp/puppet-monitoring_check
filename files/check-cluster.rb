@@ -12,6 +12,8 @@ require 'net/http'
 require 'logger'
 require 'time'
 require 'tiny_redis'
+require 'byebug'
+require 'pry-byebug'
 
 if !defined?(IN_RSPEC)
   require 'rubygems'
@@ -19,8 +21,6 @@ if !defined?(IN_RSPEC)
   require 'sensu/constants' # version is here
   require 'sensu/settings'
   require 'sensu-plugin/check/cli'
-  require 'byebug'
-  require 'pry-byebug'
 end
 
 
@@ -64,14 +64,14 @@ class CheckCluster < Sensu::Plugin::Check::CLI
   option :pct_critical,
     :short => "-C PERCENT",
     :long => "--critical PERCENT",
-    :description => "PERCENT non-ok before critical",
+    :description => "PERCENT minimum OK threshold (below this number, send alert)",
     :proc => proc {|a| a.to_i },
     :default => 80
 
   option :num_critical,
     :short => '-u NUM',
     :long => '--num-critical NUM',
-    :description => 'NUMBER (not percent) of non-ok before critical',
+    :description => 'NUMBER minimum OK threshold (below this number, send alert)',
     :proc => proc {|a| a.to_i },
     :required => false
 
@@ -272,9 +272,9 @@ private
     message << " #{silenced} silenced." if config[:silenced] && silenced > 0
     message << " #{stale.size} stale." unless stale.empty?
     if config[:num_critical]
-      message << " #{eff_total} OK #{failing.size} FAIL #{silenced} SILENT #{stale.size} STALE, #{config[:num_critical]} FAIL threshold: #{config[:num_critical]}"
+      message << " #{eff_total} OK, #{failing.size} FAIL, #{silenced} SILENT, #{stale.size} STALE, #{config[:num_critical]}; FAIL threshold: #{config[:num_critical]}."
     else
-      message << " #{ok_pct}% OK, #{config[:pct_critical]}% threshold"
+      message << " #{ok_pct}% OK, #{config[:pct_critical]}% threshold."
     end
     message << "\nStale hosts: #{stale.map{|host| host.split('.').first}.sort[0..10].join ','}" unless stale.empty?
     message << "\nFailing hosts: #{failing.map{|host| host.split('.').first}.sort[0..10].join ','}" unless failing.empty?

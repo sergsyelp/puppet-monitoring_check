@@ -1,15 +1,10 @@
 source "https://rubygems.org"
 
 group :development do
-  gem "beaker", "> 2.0.0"
-  gem "beaker-rspec", ">= 5.1.0"
-  gem "beaker-puppet_install_helper"
   gem "pry"
   gem "pry-byebug"
   gem 'simplecov', :require => false, :group => :test
   gem "puppet-blacksmith"
-  gem "serverspec"
-  gem "vagrant-wrapper"
 end
 
 group :test do
@@ -32,5 +27,4 @@ group :test do
   gem 'hiera-puppet-helper',
     :git => 'https://github.com/bobtfish/hiera-puppet-helper.git',
     :ref => '5ed989a130bc62cc6bdb923596586284f0bd73df'
-
 end
