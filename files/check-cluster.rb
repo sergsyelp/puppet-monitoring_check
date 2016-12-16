@@ -12,8 +12,6 @@ require 'net/http'
 require 'logger'
 require 'time'
 require 'tiny_redis'
-require 'byebug'
-require 'pry-byebug'
 
 if !defined?(IN_RSPEC)
   require 'rubygems'
@@ -132,12 +130,10 @@ private
     message = results_with_code
         .select{|result| result[0]==worst_code}
         .map{|result| result[1]}
-        .to_set
-        .to_a
+        .uniq
         .join(';')
     worst_method_name = EXIT_CODES.key(worst_code).downcase
-    worst_method = self.method(worst_method_name)
-    worst_method.call(message)
+    send(worst_method_name, message)
   end
 
   # Returns status, message
@@ -299,7 +295,7 @@ private
     payload = cluster_check.merge(
       :status => status,
       :output => output,
-      :Source => config[:cluster_name],
+      :source => config[:cluster_name],
       :name   => config[:check])
     payload.delete :command
 
@@ -333,7 +329,7 @@ class RedisCheckAggregate
   def summary(interval, child_cluster_name=nil)
     # we only care about entries with executed timestamp
     all     = last_execution(find_servers).select{|_,data| data[0]}
-    if !child_cluster_name.nil? then
+    if child_cluster_name
       all = all.select {|_, data| data[2]==child_cluster_name}
     end
     active  = all.select { |_, data| data[0].to_i >= Time.now.to_i - interval }
@@ -363,8 +359,7 @@ class RedisCheckAggregate
   end
 
   def child_cluster_names()
-    names = last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]}
-    Set.new(names)
+    Set.new(last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]})
   end
 
   def find_servers
@@ -378,16 +373,18 @@ class RedisCheckAggregate
 
   # Returns { server_name => [timestamp, status, cluster_name], ... }
   def last_execution(servers)
-    le = servers.inject({}) do |hash, server|
-      jvalues = @redis.get("result:#{server}:#@check")
-      values = JSON.parse(jvalues)
-      values2 = values.values_at(
-         "executed",
-         "status",
-         "cluster_name"  # monitored cluster, not sensu cluster.
-      ) rescue []
-      hash.merge!(server => values2)
+    servers.inject({}) do |hash, server|
+      begin
+        jvalues = @redis.get("result:#{server}:#@check")
+        values = JSON.parse(jvalues)
+        values2 = values.values_at(
+          "executed",
+          "status",
+          "cluster_name"  # monitored cluster, not sensu cluster.
+        )
+        hash.merge!(server => values2)
+      rescue []
+      end
     end
-    return le
   end
 end
