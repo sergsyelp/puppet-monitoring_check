@@ -359,7 +359,7 @@ class RedisCheckAggregate
   end
 
   def child_cluster_names()
-    Set.new(last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]})
+    last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]}.uniq
   end
 
   def find_servers

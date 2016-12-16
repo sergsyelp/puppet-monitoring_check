@@ -140,7 +140,7 @@ describe CheckCluster do
     it "groups by cluster_name" do
       agg = check.aggregator
       expect(agg.last_execution(agg.find_servers).size).to eq(6)
-      expect(agg.child_cluster_names).to eq(Set.new(["cluster_1","cluster_2"]))
+      expect(agg.child_cluster_names).to eq(["cluster_1","cluster_2"])
     end
 
     it "gets last execution details right" do
