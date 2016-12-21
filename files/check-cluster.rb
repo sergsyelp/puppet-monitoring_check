@@ -129,12 +129,12 @@ private
   # Check status results (are checks working?) are collected and the worst ones
   # are combined and reported.
   def run_multi
-    results = aggregator.child_cluster_names.map{
-        |child_cluster_name| run_single_child(child_cluster_name)
-    }
-    results_with_code = results.map{
-        |result| [EXIT_CODES[result[0].to_s.upcase], result[1]]
-    }
+    results = aggregator.child_cluster_names.map do |child_cluster_name|
+      run_single_child(child_cluster_name)
+    end 
+    results_with_code = results.map do |result|
+      [EXIT_CODES[result[0].to_s.upcase], result[1]]
+    end 
     worst_code = results_with_code.map {|result| result[0]}.max
     message = results_with_code
         .select{|result| result[0]==worst_code}
@@ -152,26 +152,26 @@ private
     interval = cluster_check[:interval]
     staleness_interval = cluster_check[:staleness_interval] || cluster_check[:interval]
 
-    transaction_body = lambda { |is_dry_run, child_cluster_name|
+    transaction_body = lambda do 
       status, output = check_aggregate(aggregator.summary(
         staleness_interval, child_cluster_name))
       msg = "Cluster check successfully executed, with output: #{status}: #{output}"
-      if is_dry_run then
+      if config[:dryrun]
         msg = "Dry run " + msg
       else
         logger.info output
         send_payload EXIT_CODES[status], output
       end
       return :ok, msg
-    }
+    end 
 
-    if config[:dryrun] then
-      return transaction_body.call(is_dry_run=true, child_cluster_name=child_cluster_name)
-    end
-    
-    mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
-    mutex.run_with_lock_or_skip do
-      return transaction_body.call(is_dry_run=false, child_cluster_name=child_cluster_name)
+    if config[:dryrun]
+      return transaction_body.call
+    else 
+        mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
+        mutex.run_with_lock_or_skip do
+          return transaction_body.call
+        end
     end
 
     if (ttl = mutex.ttl) && ttl >= 0
