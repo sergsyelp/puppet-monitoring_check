@@ -117,7 +117,7 @@ private
   # Sending cluster status (is cluster ok?) is delegated.
   # Check status (is check working?) is reported in this func.
   def run_single
-    result = run_single_child(child_cluster_name: nil)
+    result = run_single_child
     code = EXIT_CODES[result[0].to_s.upcase]
     message = result[1]
     method_name = EXIT_CODES.key(code).downcase
@@ -147,7 +147,7 @@ private
 
   # Returns check status, message (is check working?), for possible aggregation.
   # Sends cluster status payload (is the cluster ok?)
-  def run_single_child(child_cluster_name)
+  def run_single_child(child_cluster_name=nil)
     lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
     interval = cluster_check[:interval]
     staleness_interval = cluster_check[:staleness_interval] || cluster_check[:interval]
