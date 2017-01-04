@@ -1,7 +1,5 @@
 require "#{File.dirname(__FILE__)}/../unit_helper"
 require "#{File.dirname(__FILE__)}/../../files/check-cluster"
-require 'byebug'
-require 'pry-byebug'
 
 describe CheckCluster do
   let(:config) do
@@ -70,7 +68,6 @@ describe CheckCluster do
       it "when all is good" do
         expect_status :ok, /Cluster check successfully executed/
         expect_payload :ok, /0%/
-#        binding.pry
         check.run
       end
 

@@ -1,7 +1,5 @@
 require "#{File.dirname(__FILE__)}/../unit_helper"
 require "#{File.dirname(__FILE__)}/../../files/check-cluster"
-require 'byebug'
-require 'pry-byebug'
 
 def child_check_name
     "test_child_check"
