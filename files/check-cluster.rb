@@ -35,7 +35,7 @@ class CheckCluster < Sensu::Plugin::Check::CLI
 
   option :multi_cluster,
     :short => "-M yes",
-    :long => "--multi_cluster yes",
+    :long => "--multi-cluster yes",
     :description => "Group by cluster_name of client/child nodes.",
     :default => false
 
