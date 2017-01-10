@@ -142,21 +142,21 @@ describe CheckCluster do
     end
 
     it "gets last execution details right" do
-        agg = check.aggregator
-        servers = ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
-        le = agg.last_execution(servers)
-        expect(le.keys).to eq(
-            ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
-        )
+      agg = check.aggregator
+      servers = ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
+      le = agg.last_execution(servers)
+      expect(le.keys).to eq(
+          ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
+      )
     end
   end
 
   context "end-to-end" do
     it "no clusters failing" do
-        expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
-        expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
-        expect_status :ok, /Cluster check successfully executed/
-        check.run
+      expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
+      expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
+      expect_status :ok, /Cluster check successfully executed/
+      check.run
     end
     context "single cluster failing" do
       let(:redis) do  # TODO(pmu) want to figure out DRY - perhaps overriding 'let' per https://github.com/rspec/rspec-core/issues/294
