@@ -155,6 +155,9 @@ private
     transaction_body = lambda do 
       status, output = check_aggregate(aggregator.summary(
         staleness_interval, child_cluster_name))
+      if child_cluster_name
+        output = "Cluster: #{child_cluster_name}\n" + output
+      end
       msg = "Cluster check successfully executed, with output: #{status}: #{output}"
       if config[:dryrun]
         msg = "Dry run " + msg
