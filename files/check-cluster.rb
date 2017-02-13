@@ -341,13 +341,8 @@ class RedisCheckAggregate
     # TODO: reimplement using @redis.scan for webscale
     @servers ||= begin
       keys = @redis.keys("result:*:#@check")
-      if !keys or keys.empty?
-        if @raise_no_server_found
-          raise NoServersFound.new("No servers found for #@check")
-        else
-          keys = []
-        end
-      end
+      keys = @redis.keys("result:*:#@check") || []
+      raise NoServersFound if @raise_no_server_found && keys.empty?
       keys.map {|key| key.split(':')[1] }.reject {|s| s == @cluster_name }
     end
   end
