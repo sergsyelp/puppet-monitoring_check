@@ -20,6 +20,14 @@ def redis_keys(query)
   end
 end
 
+def redis_no_keys(query)
+  if query == "result:*:#{child_check_name}" then
+    []
+  else
+      raise "unexpected query: #{query}"
+  end
+end
+
 def cluster_name_from_host(host)
   # fabricate cluster_name using last char/digit of host IP
   "cluster_" + host.sub(/.*[-0-9]+(\d)-.*/, '\1')
@@ -78,6 +86,7 @@ describe CheckCluster do
     { :check        => child_check_name, # name of child check to be aggregated
       :cluster_name => :test_cluster,  # name of parent cluster, not children
       :multi_cluster => true,  # e.g. we're looking for groups of children
+      :ignore_nohosts => true, # some sensu clusters might not have any child clusters
       :verbose => true,  # turn on debug logging
       :pct_critical => 50,
       :min_nodes    => 0 }
@@ -113,8 +122,6 @@ describe CheckCluster do
         :sensu_settings => sensu_settings,
         :redis          => redis,
         :logger         => logger,
-#        :send_payload   => nil,
-#        :aggregator     => aggregator,
         :unknown        => nil)
     end
   end
@@ -146,12 +153,29 @@ describe CheckCluster do
       servers = ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
       le = agg.last_execution(servers)
       expect(le.keys).to eq(
-          ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
+        ["result:10-10-10-101-dcname.dev.yelpcorp.com"]
       )
     end
   end
 
   context "end-to-end" do
+    context "no clusters there at all" do
+        let(:redis) do  # TODO(pmu) want to figure out DRY - perhaps overriding 'let' per https://github.com/rspec/rspec-core/issues/294
+          double(:redis).tap do |redis|
+            redis.stub(
+              :echo    => "hello",
+              :setnx   => 1,
+              :pexpire => 1,
+              :host    => '127.0.0.1',
+              :port    => 7777, )
+            redis.stub(:keys) do |query| redis_no_keys(query) end
+          end
+        end
+        it "should be quiet: e.g. no exceptions such as NoServersFound" do
+          expect_status :ok, /No child clusters found in this sensu cluster/
+          check.run
+        end
+    end
     it "no clusters failing" do
       expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
       expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/
