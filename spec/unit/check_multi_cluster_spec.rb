@@ -175,6 +175,12 @@ describe CheckCluster do
           expect_status :ok, /No child clusters found in this sensu cluster/
           check.run
         end
+        context "not ignoring nohosts" do
+          let(:config) { super().merge ignore_nohosts: false }
+          it "should be noisy: we've said we care about missing hosts" do
+            expect{ check.run }.to raise_error(NoServersFound)
+          end
+        end
     end
     it "no clusters failing" do
       expect_payload :ok, /3 OK out of 3 total. 100% OK, 50% threshold/

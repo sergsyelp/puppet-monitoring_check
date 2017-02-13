@@ -108,7 +108,8 @@ class CheckCluster < Sensu::Plugin::Check::CLI
   end
 
   def aggregator
-    RedisCheckAggregate.new(redis, config[:check], logger, config[:cluster_name], config)
+    raise_no_server_found = !(config[:multi_cluster] and config[:ignore_nohosts])
+    RedisCheckAggregate.new( redis, config[:check], logger, config[:cluster_name], raise_no_server_found)
   end
 
 private
@@ -292,12 +293,12 @@ end
 class RedisCheckAggregate
   attr_accessor :logger
 
-  def initialize(redis, check, logger, cluster_name, config)
+  def initialize(redis, check, logger, cluster_name, raise_no_server_found)
     @check  = check
     @redis  = redis
     @logger = logger
     @cluster_name = cluster_name
-    @config = config
+    @raise_no_server_found = raise_no_server_found
   end
 
   def summary(interval, child_cluster_name=nil)
@@ -341,10 +342,10 @@ class RedisCheckAggregate
     @servers ||= begin
       keys = @redis.keys("result:*:#@check")
       if !keys or keys.empty?
-        if @config[:multi_cluster] and @config[:ignore_nohosts]
-          keys = []
-        else
+        if @raise_no_server_found
           raise NoServersFound.new("No servers found for #@check")
+        else
+          keys = []
         end
       end
       keys.map {|key| key.split(':')[1] }.reject {|s| s == @cluster_name }
