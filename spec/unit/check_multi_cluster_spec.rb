@@ -207,7 +207,7 @@ describe CheckCluster do
           :critical,
           %r{
             Cluster:\scluster_1\n
-            0\sOK\sout\sof\s3\stotal.\s0%\sOK,\s50%\sthreshold.\n
+            0\sOK\sout\sof\s3\stotal.\s0%\sOK,\s50%\sthreshold.\n\n
             Failing\shosts:\s10-10-10-101-dcname,
                              10-10-10-111-dcname,
                              10-10-10-121-dcname
@@ -238,7 +238,7 @@ describe CheckCluster do
           :critical,
           %r{
             Cluster:\scluster_1\n
-            0\sOK\sout\sof\s3\stotal.\s0%\sOK,\s50%\sthreshold.\n
+            0\sOK\sout\sof\s3\stotal.\s0%\sOK,\s50%\sthreshold.\n\n
             Failing\shosts:\s10-10-10-101-dcname,
                              10-10-10-111-dcname,
                              10-10-10-121-dcname
@@ -250,7 +250,7 @@ describe CheckCluster do
           :critical,
           %r{
             Cluster:\scluster_2\n
-            0\sOK\sout\sof\s3\stotal.\s0%\sOK,\s50%\sthreshold.\n
+            0\sOK\sout\sof\s3\stotal.\s0%\sOK,\s50%\sthreshold.\n\n
             Failing\shosts:\s10-10-10-102-dcname,
                              10-10-10-112-dcname,
                              10-10-10-122-dcname

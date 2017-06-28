@@ -118,6 +118,7 @@ private
   # Sending cluster status (is cluster ok?) is delegated.
   # Check status (is check working?) is reported in this func.
   def run_single
+    puts "\nRUN_SINGLE\n"
     result = run_single_child
     code = EXIT_CODES[result[0].to_s.upcase]
     message = result[1]
@@ -130,6 +131,8 @@ private
   # Check status results (are checks working?) are collected and the worst ones
   # are combined and reported.
   def run_multi
+    puts "\nRUN_MULTI\n"
+    puts aggregator.child_cluster_names.join('; ')
     results = aggregator.child_cluster_names.map do |child_cluster_name|
       run_single_child(child_cluster_name)
     end 
@@ -144,8 +147,9 @@ private
           .select{|result| result[0]==worst_code}
           .map{|result| result[1]}
           .uniq
-          .join(';')
+          .join("\n")
       worst_method_name = EXIT_CODES.key(worst_code).downcase
+      puts "\nRUN_MULTI sending worst\n"
       send(worst_method_name, message)
     end
   end
@@ -153,6 +157,7 @@ private
   # Returns check status, message (is check working?), for possible aggregation.
   # Sends cluster status payload (is the cluster ok?)
   def run_single_child(child_cluster_name=nil)
+    puts "\nRUN_SINGLE_CHILD #{child_cluster_name}\n"
     lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
     interval = cluster_check[:interval]
     staleness_interval = cluster_check[:staleness_interval] || cluster_check[:interval]
@@ -173,18 +178,18 @@ private
       return :ok, msg
     end 
 
-    if config[:dryrun]
+#    if config[:dryrun]
       return transaction_body.call
-    else 
-        mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
-        mutex.run_with_lock_or_skip do
-          return transaction_body.call
-        end
-    end
+#    else 
+#        mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
+#        mutex.run_with_lock_or_skip do
+#          return transaction_body.call
+#        end
+#    end
 
-    if (ttl = mutex.ttl) && ttl >= 0
-      return :ok, "Cluster check did not execute, lock expires in #{ttl}"
-    end
+#    if (ttl = mutex.ttl) && ttl >= 0
+#      return :ok, "Cluster check did not execute, lock expires in #{ttl}"
+#    end
 
     if ttl.nil?
       return :ok, "Cluster check did not execute, lock expired sooner than round-trip time to redis server"
@@ -243,11 +248,11 @@ private
     message << " #{silenced} silenced." if config[:silenced] && silenced > 0
     message << " #{stale.size} stale." unless stale.empty?
     if config[:num_critical]
-      message << " #{eff_total} OK, #{failing.size} FAIL, #{silenced} SILENT, #{stale.size} STALE, #{config[:num_critical]}; FAIL threshold: #{config[:num_critical]}."
+      message << " #{eff_total} OK, #{failing.size} FAIL, #{silenced} SILENT, #{stale.size} STALE, #{config[:num_critical]}; FAIL threshold: #{config[:num_critical]}.\n"
     else
-      message << " #{ok_pct}% OK, #{config[:pct_critical]}% threshold."
+      message << " #{ok_pct}% OK, #{config[:pct_critical]}% threshold.\n"
     end
-    message << "\nStale hosts: #{stale.map{|host| host.split('.').first}.sort[0..10].join ','}" unless stale.empty?
+    message << "Stale hosts: #{stale.map{|host| host.split('.').first}.sort[0..10].join ','}" unless stale.empty?
     message << "\nFailing hosts: #{failing.map{|host| host.split('.').first}.sort[0..10].join ','}" unless failing.empty?
     message << "\nMinimum number of hosts required is #{config[:min_nodes]} and only #{ok} found" if ok < config[:min_nodes]
 
@@ -339,7 +344,7 @@ class RedisCheckAggregate
   end
 
   def child_cluster_names()
-    last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]}.uniq
+    last_execution(find_servers).values.select{|data| data[0]}.map{|data| data[2]}.uniq.reject{ |s| s == nil || s.empty? }
   end
 
   def find_servers
