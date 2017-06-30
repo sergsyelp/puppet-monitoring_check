@@ -339,7 +339,7 @@ class RedisCheckAggregate
   end
 
   def child_cluster_names()
-     last_execution(find_servers).values.map{|(_,_,name)| name if name && !name.empty?}.compact.uniq
+     last_execution(find_servers).values.map{|(t,_,name)| name if t && name && !name.empty?}.compact.uniq
   end
 
   def find_servers
