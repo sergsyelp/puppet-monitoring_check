@@ -133,9 +133,9 @@ private
   # are combined and reported.
   def run_multi
     results = enclose_in_redis_transaction do
-        aggregator.child_cluster_names.map do |child_cluster_name|
-          run_single_child(child_cluster_name)
-        end 
+      aggregator.child_cluster_names.map do |child_cluster_name|
+        run_single_child(child_cluster_name)
+      end 
     end
     if results.empty?
       send('ok', 'No child clusters found in this sensu cluster.')
@@ -149,9 +149,13 @@ private
           .map{|result| result[1]}
           .uniq
           .join(';')
+      puts "WORST_CODE: #{worst_code.to_s}"
       worst_method_name = EXIT_CODES.key(worst_code).downcase
       send(worst_method_name, message)
     end
+  rescue NoServersFound => e
+    puts "\nYYYYYYYYYYYYYYYYYY noserversfound #{e.message}\n"
+    send :unknown, "#{e.message}"
   end
 
   # Executes the passed block within a redis mutex transaction if not dryrun
@@ -164,18 +168,37 @@ private
       puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction outside\n"
       r = yield
       puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction yielding #{r}\n"
-      r
+      return r
     else
       puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction inside\n"
       lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
       mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
       mutex.run_with_lock_or_skip do
-        puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction outside\n"
         r = yield
         puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction yielding #{r}\n"
-        r
+        return r
       end
     end
+
+    if (ttl = mutex.ttl) && ttl >= 0
+      return :ok, "Cluster check did not execute, lock expires in #{ttl}"
+    end
+
+    if ttl.nil?
+      return :ok, "Cluster check did not execute, lock expired sooner than round-trip time to redis server"
+    end
+
+    return :critical, "Cluster check did not execute, ttl: #{ttl.inspect}"
+  rescue SocketError => e
+    return :unknown, "Can't connect to Redis at #{redis.host}:#{redis.port}: #{e.message}"
+  rescue NoServersFound => e
+    if config[:ignore_nohosts]
+      return :ok, "Cluster check did not find any hosts: #{e.message}"
+    else
+      raise
+    end
+  rescue RuntimeError => e
+    return :critical, "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
 
   # Returns check status, message (is check working?), for possible aggregation.
@@ -198,26 +221,6 @@ private
       send_payload EXIT_CODES[status], output, child_cluster_name
     end
     return :ok, msg
-
-    if (ttl = mutex.ttl) && ttl >= 0
-      return :ok, "Cluster check did not execute, lock expires in #{ttl}"
-    end
-
-    if ttl.nil?
-      return :ok, "Cluster check did not execute, lock expired sooner than round-trip time to redis server"
-    end
-
-    return :critical, "Cluster check did not execute, ttl: #{ttl.inspect}"
-  rescue SocketError => e
-    return :unknown, "Can't connect to Redis at #{redis.host}:#{redis.port}: #{e.message}"
-  rescue NoServersFound => e
-    if config[:ignore_nohosts]
-      return :ok, "Cluster check did not find any hosts: #{e.message}"
-    else
-     return :unknown, "#{e.message}"
-    end
-  rescue RuntimeError => e
-    return :critical, "#{e.message} (#{e.class}): #{e.backtrace.inspect}"
   end
   
   def logger

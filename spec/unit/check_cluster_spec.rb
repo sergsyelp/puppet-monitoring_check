@@ -75,14 +75,10 @@ describe CheckCluster do
       end
 
       it "when lock was not acquired" do
-        puts "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX starting test\n"
         redis.stub(:setnx).and_return 0
         redis.stub(:pttl).and_return 10000.0
         expect_status :ok, /expires in 10/
-        puts "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX check.run starting\n"
         check.run
-        puts "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX check.run finished\n"
-        puts "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX check.run finished\n"
       end
 
       it "when lock expired" do

@@ -178,8 +178,12 @@ describe CheckCluster do
         end
         context "not ignoring nohosts" do
           let(:config) { super().merge ignore_nohosts: false }
+#          puts "CONFIG #{config}"
           it "should be noisy: we've said we care about missing hosts" do
-            expect{ check.run }.to raise_error(NoServersFound)
+            expect_status :unknown, /NoServersFound/
+            puts "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX check.run starting\n"
+            check.run
+            puts "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX check.run finished\n"
           end
         end
     end
