@@ -91,7 +91,6 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     :default => false
 
   def run
-    puts "\nYYYYYYYYYYYYYYYYYYYYYYY starting run\n"
     unless check_sensu_version
       unknown "Sensu <0.13 is not supported"
       return
@@ -106,7 +105,6 @@ class CheckCluster < Sensu::Plugin::Check::CLI
     else
       run_single
     end
-    puts "\nYYYYYYYYYYYYYYYYYYYYYYY ending run\n"
   end
 
   def aggregator
@@ -115,7 +113,7 @@ class CheckCluster < Sensu::Plugin::Check::CLI
   end
 
 private
- 
+
   # multi_cluster is not enabled: do a single check across all nodes.
   # Sending cluster status (is cluster ok?) is delegated.
   # Check status (is check working?) is reported in this func.
@@ -135,48 +133,37 @@ private
     results = enclose_in_redis_transaction do
       aggregator.child_cluster_names.map do |child_cluster_name|
         run_single_child(child_cluster_name)
-      end 
+      end
     end
     if results.empty?
       send('ok', 'No child clusters found in this sensu cluster.')
     else
       results_with_code = results.map do |result|
         [EXIT_CODES[result[0].to_s.upcase], result[1]]
-      end 
+      end
       worst_code = results_with_code.map {|result| result[0]}.max
       message = results_with_code
           .select{|result| result[0]==worst_code}
           .map{|result| result[1]}
           .uniq
           .join(';')
-      puts "WORST_CODE: #{worst_code.to_s}"
       worst_method_name = EXIT_CODES.key(worst_code).downcase
       send(worst_method_name, message)
     end
   rescue NoServersFound => e
-    puts "\nYYYYYYYYYYYYYYYYYY noserversfound #{e.message}\n"
     send :unknown, "#{e.message}"
   end
 
   # Executes the passed block within a redis mutex transaction if not dryrun
   def enclose_in_redis_transaction
-    puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction starting\n"
     interval = cluster_check[:interval]
-    puts "\nYYYYYYYYYYYYYYYYYY interval: #{interval}\n"
-    puts "\nYYYYYYYYYYYYYYYYYY dryrun: #{config[:dryrun] ? "true" : "false"}\n"
     if config[:dryrun]
-      puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction outside\n"
-      r = yield
-      puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction yielding #{r}\n"
-      return r
+      return yield
     else
-      puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction inside\n"
       lock_key = "lock:#{config[:cluster_name]}:#{config[:check]}"
       mutex = TinyRedis::Mutex.new(redis, lock_key, interval, logger)
       mutex.run_with_lock_or_skip do
-        r = yield
-        puts "\nYYYYYYYYYYYYYYYYYY enclose_in_redis_transaction yielding #{r}\n"
-        return r
+        return yield
       end
     end
 
@@ -222,7 +209,7 @@ private
     end
     return :ok, msg
   end
-  
+
   def logger
     @logger ||= Logger.new($stdout).tap do |logger|
       logger.formatter = proc {|_, _, _, msg| msg} if logger.respond_to? :formatter=
