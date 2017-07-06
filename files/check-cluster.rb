@@ -135,21 +135,27 @@ private
         run_single_child(child_cluster_name)
       end
     end
+    #TODO simplify communication of cluster state(s) from run_single_child to run_single and run_multi.
     if results.empty?
       send('ok', 'No child clusters found in this sensu cluster.')
+      return
     else
-      results_with_code = results.map do |result|
-        [EXIT_CODES[result[0].to_s.upcase], result[1]]
+      if !results[0].kind_of?(Array)
+        # enclose_in_redis_transaction has returned a single status row
+        results = [results]
       end
-      worst_code = results_with_code.map {|result| result[0]}.max
-      message = results_with_code
-          .select{|result| result[0]==worst_code}
-          .map{|result| result[1]}
-          .uniq
-          .join(';')
-      worst_method_name = EXIT_CODES.key(worst_code).downcase
-      send(worst_method_name, message)
     end
+    results_with_code = results.map do |result|
+      [EXIT_CODES[result[0].to_s.upcase], result[1]]
+    end
+    worst_code = results_with_code.map {|result| result[0]}.max
+    message = results_with_code
+        .select{|result| result[0]==worst_code}
+        .map{|result| result[1]}
+        .uniq
+        .join(';')
+    worst_method_name = EXIT_CODES.key(worst_code).downcase
+    send(worst_method_name, message)
   rescue NoServersFound => e
     send :unknown, "#{e.message}"
   end
